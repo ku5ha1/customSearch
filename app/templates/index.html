@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-white px-[3%] py-8">
+    <h1 class="text-4xl font-bold text-gray-800 mb-2">Sheet6 Search</h1>
+    <p class="text-gray-600 mb-6">Search categories, PDPs, or PLPs (e.g., <span class="italic text-blue-600">Atta</span>, <span class="italic text-blue-600">1166</span>).</p>
+
+    <!-- Search Form -->
+    <form id="searchForm" class="flex flex-col sm:flex-row gap-3 mb-6">
+        <input
+            type="text"
+            name="query"
+            placeholder="Search term"
+            required
+            autocomplete="off"
+            class="flex-grow px-4 py-3 border border-gray-300 rounded-md shadow-sm text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+        <button 
+            type="submit"
+            class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-md text-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+            Search
+        </button>
+    </form>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden py-4 text-blue-600 italic">
+        Searching, please wait...
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="mt-6"></div>
+</div>
+{% endblock %}

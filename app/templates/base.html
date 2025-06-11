@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Excel Search App</title>
+    <title>Custom Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/static/js/search.js"></script>
     <link href="/static/css/tailwind.css" rel="stylesheet" />
@@ -18,6 +18,24 @@
     </style>
   </head>
   <body class="bg-gray-100">
-    {% block content %}{% endblock %}
+    <nav class="bg-white shadow-md">
+      <div class="max-w-screen-xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="text-lg font-bold text-gray-800">Custom Search</div>
+        <ul class="flex space-x-4 text-sm font-medium text-gray-700">
+          <li><a href="pdp-plp" class="hover:text-blue-600">Category PDP PLP</a></li>
+          <li><a href="/attributes" class="hover:text-blue-600">Attributes</a></li>
+          <li><a href="/ptypes-dump" class="hover:text-blue-600">Ptypes Dump</a></li>
+          <li><a href="/product-types" class="hover:text-blue-600">Product Types</a></li>
+          <li><a href="/concat-rule" class="hover:text-blue-600">Concat Rule</a></li>
+          <li><a href="/category-tree" class="hover:text-blue-600">Category Tree</a></li>
+          <li><a href="/rejections" class="hover:text-blue-600">Rejections</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main class="px-6 mt-4">
+      {% block content %}{% endblock %}
+    </main>
   </body>
 </html>

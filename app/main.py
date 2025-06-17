@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from pathlib import Path
 
-from routes import pdp_plp, attributes, concat_rule
+from routes import pdp_plp, attributes, concat_rule, category_tree
 
 app = FastAPI()
 router = APIRouter()
@@ -21,3 +21,4 @@ app.include_router(router)
 app.include_router(pdp_plp.router)     
 app.include_router(attributes.router)  
 app.include_router(concat_rule.router)
+app.include_router(category_tree.router)

@@ -2,8 +2,8 @@
 
 {% block content %}
 <div class="min-h-screen bg-white px-[3%] py-8">
-    <h4 class="text-4xl font-bold text-gray-800 mb-2">Concat Rule</h4>
-    <p class="text-gray-600 mb-6">Search concat rules by category name, L1, L2, or concat rule.</p>
+    <h4 class="text-4xl font-bold text-gray-800 mb-2">Category Tree</h4>
+    <p class="text-gray-600 mb-6">Search category tree by L0, L1, or L2 categories and their IDs.</p>
 
     <!-- Search Form -->
     <form id="searchForm" class="flex flex-col sm:flex-row gap-3 mb-6">
@@ -51,7 +51,7 @@ document.getElementById("searchForm").addEventListener("submit", async function(
     results.innerHTML = "";
 
     try {
-        const response = await fetch(`/concat-rule/search?t=${Date.now()}`, {
+        const response = await fetch(`/category-tree/search?t=${Date.now()}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -81,10 +81,12 @@ document.getElementById("searchForm").addEventListener("submit", async function(
             const thead = `
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="border px-4 py-2 text-left">Category Name</th>
-                        <th class="border px-4 py-2 text-left">L1</th>
-                        <th class="border px-4 py-2 text-left">L2</th>
-                        <th class="border px-4 py-2 text-left">Concat Rule</th>
+                        <th class="border px-4 py-2 text-left">L0 Category ID</th>
+                        <th class="border px-4 py-2 text-left">L0 Category</th>
+                        <th class="border px-4 py-2 text-left">L1 Category ID</th>
+                        <th class="border px-4 py-2 text-left">L1 Category</th>
+                        <th class="border px-4 py-2 text-left">L2 Category ID</th>
+                        <th class="border px-4 py-2 text-left">L2 Category</th>
                     </tr>
                 </thead>`;
             table.innerHTML = thead;
@@ -95,21 +97,27 @@ document.getElementById("searchForm").addEventListener("submit", async function(
                 const tr = document.createElement("tr");
                 tr.className = "hover:bg-blue-50";
                 
-                const categoryName = row["Category Name"] || "";
-                const l1 = row["L1"] || "";
-                const l2 = row["L2"] || "";
-                const concatRule = row["Concat Rule"] || "";
+                const l0CategoryId = row["l0_category_id"] || "";
+                const l0Category = row["l0_category"] || "";
+                const l1CategoryId = row["l1_category_id"] || "";
+                const l1Category = row["l1_category"] || "";
+                const l2CategoryId = row["l2_category_id"] || "";
+                const l2Category = row["l2_category"] || "";
                 
-                const isCategoryMatch = result.matched_columns.hasOwnProperty("Category Name");
-                const isL1Match = result.matched_columns.hasOwnProperty("L1");
-                const isL2Match = result.matched_columns.hasOwnProperty("L2");
-                const isConcatRuleMatch = result.matched_columns.hasOwnProperty("Concat Rule");
+                const isL0CategoryIdMatch = result.matched_columns.hasOwnProperty("l0_category_id");
+                const isL0CategoryMatch = result.matched_columns.hasOwnProperty("l0_category");
+                const isL1CategoryIdMatch = result.matched_columns.hasOwnProperty("l1_category_id");
+                const isL1CategoryMatch = result.matched_columns.hasOwnProperty("l1_category");
+                const isL2CategoryIdMatch = result.matched_columns.hasOwnProperty("l2_category_id");
+                const isL2CategoryMatch = result.matched_columns.hasOwnProperty("l2_category");
                 
                 tr.innerHTML = `
-                    <td class="border px-4 py-2">${isCategoryMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(categoryName, data.query)}</span>` : categoryName}</td>
-                    <td class="border px-4 py-2">${isL1Match ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l1, data.query)}</span>` : l1}</td>
-                    <td class="border px-4 py-2">${isL2Match ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l2, data.query)}</span>` : l2}</td>
-                    <td class="border px-4 py-2">${isConcatRuleMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(concatRule, data.query)}</span>` : concatRule}</td>
+                    <td class="border px-4 py-2">${isL0CategoryIdMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l0CategoryId, data.query)}</span>` : l0CategoryId}</td>
+                    <td class="border px-4 py-2">${isL0CategoryMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l0Category, data.query)}</span>` : l0Category}</td>
+                    <td class="border px-4 py-2">${isL1CategoryIdMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l1CategoryId, data.query)}</span>` : l1CategoryId}</td>
+                    <td class="border px-4 py-2">${isL1CategoryMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l1Category, data.query)}</span>` : l1Category}</td>
+                    <td class="border px-4 py-2">${isL2CategoryIdMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l2CategoryId, data.query)}</span>` : l2CategoryId}</td>
+                    <td class="border px-4 py-2">${isL2CategoryMatch ? `<span class="bg-yellow-200 text-blue-900 font-semibold px-1 rounded">${highlightMatch(l2Category, data.query)}</span>` : l2Category}</td>
                 `;
                 tbody.appendChild(tr);
             });

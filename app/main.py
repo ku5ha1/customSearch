@@ -72,6 +72,11 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 async def homepage():
     return RedirectResponse(url="/pdp-plp")
 
+@router.get("/health")
+async def health_check():
+    """Health check endpoint for Vercel deployment"""
+    return JSONResponse({"status": "healthy", "message": "Custom Search App is running"})
+
 @router.get("/cache/stats")
 async def get_cache_stats():
     """Get cache statistics for monitoring"""
@@ -90,3 +95,8 @@ app.include_router(concat_rule.router)
 app.include_router(category_tree.router)
 app.include_router(rejections.router)
 app.include_router(ptypes_dump.router)
+
+# For Vercel serverless deployment
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

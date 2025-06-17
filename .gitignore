@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-data/
 
 # C extensions
 *.so
@@ -114,3 +113,5 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# NOTE: data/ folder is NOT ignored - Excel files need to be deployed

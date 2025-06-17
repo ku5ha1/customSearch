@@ -36,13 +36,19 @@ def generate_cache_key(query: str) -> str:
     return hashlib.md5(f"pdp_plp_search_{query.lower().strip()}".encode()).hexdigest()
 
 # Load Excel on module load
+data = []
 try:
-    df = pd.read_excel(DATA_FILE, header=0)
-    df = df.where(pd.notnull(df), None)
-    data = df.to_dict(orient="records")
-    print(f"[PDP-PLP] Data loaded successfully at {datetime.now()}")
+    if DATA_FILE.exists():
+        df = pd.read_excel(DATA_FILE, header=0)
+        df = df.where(pd.notnull(df), None)
+        data = df.to_dict(orient="records")
+        print(f"[PDP-PLP] Data loaded successfully at {datetime.now()}")
+    else:
+        print(f"[PDP-PLP] Warning: Data file not found at {DATA_FILE}")
+        data = []
 except Exception as e:
-    raise RuntimeError(f"Failed to load PDP/PLP data: {e}")
+    print(f"[PDP-PLP] Warning: Failed to load data: {e}")
+    data = []
 
 # Routes
 @router.get("/pdp-plp", response_class=HTMLResponse)
@@ -60,6 +66,16 @@ async def pdp_plp_search(request: Request, response: Response, query: str = Form
     query = query.strip()
     if not query:
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
+
+    # Check if data is available
+    if not data:
+        return JSONResponse({
+            "error": "Data file not available. Please ensure category_pdp_plp.xlsx is uploaded.",
+            "query": query,
+            "results": [],
+            "total_matches": 0,
+            "timestamp": datetime.now().isoformat()
+        })
 
     # Check cache first
     from main import search_cache

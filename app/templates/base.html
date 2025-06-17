@@ -5,27 +5,65 @@
     <title>Custom Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/css/tailwind.css" rel="stylesheet" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Manrope:wght@200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Unkempt:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
       body {
-        font-family: "Inter", sans-serif;
+        font-family: "Poppins", sans-serif;
+      }
+      
+      .nav-link {
+        position: relative;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s ease-in-out;
+      }
+      
+      .nav-link:hover {
+        background-color: #eff6ff;
+        color: #1d4ed8;
+        transform: scale(1.05);
+      }
+      
+      .nav-link.active {
+        background-color: #dbeafe;
+        color: #1e40af;
+        font-weight: 600;
+      }
+      
+      .nav-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: -0.125rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 1.25rem;
+        height: 0.125rem;
+        background-color: #1d4ed8;
+        border-radius: 0.0625rem;
       }
     </style>
   </head>
   <body class="bg-gray-100">
-    <nav class="bg-white shadow-md">
-      <div class="max-w-screen-xl mx-auto px-4 py-3 flex justify-between items-center">
-        <div class="text-lg font-bold text-gray-800">Custom Search</div>
-        <ul class="flex space-x-4 text-sm font-medium text-gray-700">
-          <li><a href="pdp-plp" class="hover:text-blue-600">Category PDP PLP</a></li>
-          <li><a href="/attributes/" class="hover:text-blue-600">Attributes</a></li>
-          <li><a href="/ptypes-dump" class="hover:text-blue-600">Ptypes Dump</a></li>
-          <li><a href="/concat-rule" class="hover:text-blue-600">Concat Rule</a></li>
-          <li><a href="/category-tree" class="hover:text-blue-600">Category Tree</a></li>
-          <li><a href="/rejections" class="hover:text-blue-600">Rejections</a></li>
+    <nav class="bg-white shadow-lg border-b border-gray-200">
+      <div class="max-w-screen-xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="text-xl font-bold text-gray-800 flex items-center">
+          <svg class="w-8 h-8 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          Custom Search
+        </div>
+        <ul class="flex space-x-1 text-sm font-medium">
+          <li><a href="/pdp-plp" class="nav-link" id="nav-pdp-plp">Category PDP PLP</a></li>
+          <li><a href="/attributes" class="nav-link" id="nav-attributes">Attributes</a></li>
+          <li><a href="/ptypes-dump" class="nav-link" id="nav-ptypes-dump">Ptypes Dump</a></li>
+          <li><a href="/concat-rule" class="nav-link" id="nav-concat-rule">Concat Rule</a></li>
+          <li><a href="/category-tree" class="nav-link" id="nav-category-tree">Category Tree</a></li>
+          <li><a href="/rejections" class="nav-link" id="nav-rejections">Rejections</a></li>
         </ul>
       </div>
     </nav>
@@ -34,5 +72,19 @@
     <main class="px-6 mt-4">
       {% block content %}{% endblock %}
     </main>
+
+    <script>
+      // Set active navigation based on current page
+      document.addEventListener('DOMContentLoaded', function() {
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.nav-link');
+        
+        navLinks.forEach(link => {
+          if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+          }
+        });
+      });
+    </script>
   </body>
 </html>

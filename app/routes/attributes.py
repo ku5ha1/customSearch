@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import re
 import math
+import hashlib
 from datetime import datetime
 
 router = APIRouter()
@@ -26,6 +27,10 @@ def clean_data_for_json(data):
     elif isinstance(data, float) and math.isnan(data):
         return None
     return data
+
+# Helper to generate cache key
+def generate_cache_key(query: str) -> str:
+    return hashlib.md5(f"attributes_search_{query.lower().strip()}".encode()).hexdigest()
 
 # Load Excel on module load
 try:
@@ -53,6 +58,16 @@ async def attributes_search(request: Request, response: Response, query: str = F
     if not query:
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
 
+    # Check cache first
+    from main import search_cache
+    cache_key = generate_cache_key(query)
+    cached_result = search_cache.get(cache_key)
+    
+    if cached_result:
+        print(f"[Attributes] Cache hit for query '{query}'")
+        return JSONResponse(cached_result)
+
+    # Perform search if not in cache
     pattern = re.compile(re.escape(query), re.IGNORECASE)
     results = []
 
@@ -68,10 +83,16 @@ async def attributes_search(request: Request, response: Response, query: str = F
                 "matched_columns": matches
             })
 
-    print(f"[Attributes] Found {len(results)} matches for query '{query}'")
-    return JSONResponse({
+    result_data = {
         "query": query,
         "results": results,
         "total_matches": len(results),
-        "timestamp": datetime.now().isoformat()
-    })
+        "timestamp": datetime.now().isoformat(),
+        "cached": False
+    }
+
+    # Cache the result
+    search_cache.set(cache_key, result_data)
+    print(f"[Attributes] Found {len(results)} matches for query '{query}' (cached)")
+
+    return JSONResponse(result_data)

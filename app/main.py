@@ -7,7 +7,7 @@ import time
 from collections import OrderedDict
 from typing import Dict, Any, Optional
 
-from routes import pdp_plp, attributes, concat_rule, category_tree, rejections, ptypes_dump
+from .routes import pdp_plp, attributes, concat_rule, category_tree, rejections, ptypes_dump
 
 # Simple in-memory cache with TTL
 class SimpleCache:

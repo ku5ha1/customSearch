@@ -33,7 +33,7 @@ def generate_cache_key(query: str) -> str:
 
 # Load Excel on module load
 try:
-    df = pd.read_excel(DATA_FILE, header=0)
+    df = pd.read_excel(DATA_FILE, sheet_name='PTypes Dump', header=0)
     df = df.where(pd.notnull(df), None)
     data = df.to_dict(orient="records")
     print(f"[Ptypes Dump] Data loaded successfully at {datetime.now()}")

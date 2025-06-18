@@ -78,7 +78,7 @@ async def pdp_plp_search(request: Request, response: Response, query: str = Form
         })
 
     # Check cache first
-    from main import search_cache
+    from app.main import search_cache
     cache_key = generate_cache_key(query)
     cached_result = search_cache.get(cache_key)
     

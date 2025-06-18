@@ -58,7 +58,7 @@ async def category_tree_search(request: Request, response: Response, query: str 
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
 
     # Check cache first
-    from main import search_cache
+    from app.main import search_cache
     cache_key = generate_cache_key(query)
     cached_result = search_cache.get(cache_key)
     

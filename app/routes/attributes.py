@@ -7,6 +7,9 @@ import re
 import math
 import hashlib
 from datetime import datetime
+import io
+
+from app.config import config
 
 router = APIRouter()
 
@@ -14,6 +17,13 @@ router = APIRouter()
 current_dir = Path(__file__).resolve().parent.parent
 DATA_FILE = current_dir.parent / "data" / "attributes.xlsx"
 templates = Jinja2Templates(directory=current_dir / "templates")
+
+# Check if Vercel Blob is configured
+BLOB_ENABLED = config.validate_blob_config()
+if BLOB_ENABLED:
+    from vercel_blob import get
+else:
+    print("⚠ Vercel Blob not configured - Attributes will use local files only")
 
 # Columns to search in
 SEARCH_COLUMNS = ["AttributeID", "AttributeName", "Source", "2"]
@@ -32,14 +42,31 @@ def clean_data_for_json(data):
 def generate_cache_key(query: str) -> str:
     return hashlib.md5(f"attributes_search_{query.lower().strip()}".encode()).hexdigest()
 
-# Load Excel on module load
-try:
-    df = pd.read_excel(DATA_FILE, header=0)
-    df = df.where(pd.notnull(df), None)
-    data = df.to_dict(orient="records")
-    print(f"[Attributes] Data loaded successfully at {datetime.now()}")
-except Exception as e:
-    raise RuntimeError(f"Failed to load attributes data: {e}")
+# Load data from Vercel Blob or local file
+async def load_data():
+    try:
+        if BLOB_ENABLED:
+            try:
+                blob = await get("attributes.xlsx")
+                df = pd.read_excel(io.BytesIO(blob), header=0)
+                df = df.where(pd.notnull(df), None)
+                data = df.to_dict(orient="records")
+                print(f"[Attributes] Data loaded from Vercel Blob at {datetime.now()}")
+                return data
+            except Exception as e:
+                print(f"[Attributes] Failed to load from Vercel Blob: {e}")
+        if DATA_FILE.exists():
+            df = pd.read_excel(DATA_FILE, header=0)
+            df = df.where(pd.notnull(df), None)
+            data = df.to_dict(orient="records")
+            print(f"[Attributes] Data loaded from local file at {datetime.now()}")
+            return data
+        else:
+            print(f"[Attributes] Warning: Data file not found at {DATA_FILE}")
+            return []
+    except Exception as e:
+        print(f"[Attributes] Warning: Failed to load data: {e}")
+        return []
 
 # Routes
 @router.get("/attributes", response_class=HTMLResponse)
@@ -57,6 +84,9 @@ async def attributes_search(request: Request, response: Response, query: str = F
     query = query.strip()
     if not query:
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
+
+    # Load data (from Blob or local file)
+    data = await load_data()
 
     # Check cache first
     from app.main import search_cache

@@ -7,11 +7,22 @@ import re
 import math
 import hashlib
 from datetime import datetime
+import io
+
+from app.config import config
 
 router = APIRouter()
 current_dir = Path(__file__).parent.parent
 DATA_FILE = current_dir.parent / "data" / "category_pdp_plp.xlsx"
 templates = Jinja2Templates(directory=current_dir / "templates")
+
+# Check if Vercel Blob is configured
+BLOB_ENABLED = config.validate_blob_config()
+
+if BLOB_ENABLED:
+    from vercel_blob import get
+else:
+    print("⚠ Vercel Blob not configured - PDP-PLP will use local files only")
 
 SEARCH_COLUMNS = [
     "L0_category", "L1_category", "L1_category_id", 
@@ -35,20 +46,37 @@ def clean_data_for_json(data):
 def generate_cache_key(query: str) -> str:
     return hashlib.md5(f"pdp_plp_search_{query.lower().strip()}".encode()).hexdigest()
 
-# Load Excel on module load
-data = []
-try:
-    if DATA_FILE.exists():
-        df = pd.read_excel(DATA_FILE, header=0)
-        df = df.where(pd.notnull(df), None)
-        data = df.to_dict(orient="records")
-        print(f"[PDP-PLP] Data loaded successfully at {datetime.now()}")
-    else:
-        print(f"[PDP-PLP] Warning: Data file not found at {DATA_FILE}")
-        data = []
-except Exception as e:
-    print(f"[PDP-PLP] Warning: Failed to load data: {e}")
-    data = []
+# Load data from Vercel Blob or local file
+async def load_data():
+    """Load data from Vercel Blob if available, otherwise from local file"""
+    try:
+        if BLOB_ENABLED:
+            # Try to load from Vercel Blob first
+            try:
+                blob = await get("category_pdp_plp.xlsx")
+                df = pd.read_excel(io.BytesIO(blob), header=0)
+                df = df.where(pd.notnull(df), None)
+                data = df.to_dict(orient="records")
+                print(f"[PDP-PLP] Data loaded from Vercel Blob at {datetime.now()}")
+                return data
+            except Exception as e:
+                print(f"[PDP-PLP] Failed to load from Vercel Blob: {e}")
+                # Fallback to local file
+        
+        # Load from local file
+        if DATA_FILE.exists():
+            df = pd.read_excel(DATA_FILE, header=0)
+            df = df.where(pd.notnull(df), None)
+            data = df.to_dict(orient="records")
+            print(f"[PDP-PLP] Data loaded from local file at {datetime.now()}")
+            return data
+        else:
+            print(f"[PDP-PLP] Warning: Data file not found at {DATA_FILE}")
+            return []
+            
+    except Exception as e:
+        print(f"[PDP-PLP] Warning: Failed to load data: {e}")
+        return []
 
 # Routes
 @router.get("/pdp-plp", response_class=HTMLResponse)
@@ -67,10 +95,13 @@ async def pdp_plp_search(request: Request, response: Response, query: str = Form
     if not query:
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
 
+    # Load data (from Blob or local file)
+    data = await load_data()
+    
     # Check if data is available
     if not data:
         return JSONResponse({
-            "error": "Data file not available. Please ensure category_pdp_plp.xlsx is uploaded.",
+            "error": "Data file not available. Please ensure category_pdp_plp.xlsx is uploaded via admin interface.",
             "query": query,
             "results": [],
             "total_matches": 0,

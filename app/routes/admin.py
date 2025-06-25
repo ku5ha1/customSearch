@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 import asyncio
 import requests
+import io
 
 from app.config import config
 
@@ -18,7 +19,7 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 BLOB_ENABLED = config.validate_blob_config()
 
 if BLOB_ENABLED:
-    from vercel_blob import put, list, del_
+    from vercel_blob import put, list, delete
 else:
     print("⚠ Vercel Blob not configured - admin features will be limited")
 
@@ -60,7 +61,7 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
     """Validate Excel file structure"""
     try:
         # Read Excel file
-        df = pd.read_excel(file_content, header=0)
+        df = pd.read_excel(io.BytesIO(file_content), header=0)
         
         # Check if required columns exist
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -78,8 +79,8 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
 async def upload_to_vercel_blob(file_content: bytes, filename: str) -> str:
     """Upload file to Vercel Blob Storage"""
     try:
-        blob = put(filename, file_content, {"access": "public"})
-        return blob.url
+        blob = put(filename, file_content, {"access": "public", "allowOverwrite": True})
+        return blob["url"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to cloud storage: {str(e)}")
 
@@ -203,7 +204,7 @@ async def upload_excel_file(
             "success": True,
             "message": f"{config_excel['description']} updated successfully",
             "filename": filename,
-            "rows_processed": len(pd.read_excel(file_content)),
+            "rows_processed": len(pd.read_excel(io.BytesIO(file_content))),
             "timestamp": datetime.now().isoformat()
         })
         

@@ -43,10 +43,12 @@ def generate_cache_key(query: str) -> str:
 # Load data from Vercel Blob or local file
 async def load_data():
     try:
+        print(f"[Rejections] BLOB_ENABLED: {BLOB_ENABLED}")
         if BLOB_ENABLED:
             try:
                 import vercel_blob
                 blobs = vercel_blob.list()
+                print(f"[Rejections] Blobs found: {[b['pathname'] for b in blobs['blobs']]}")
                 download_url = None
                 for blob in blobs['blobs']:
                     if blob['pathname'] == 'rejection_reasons.xlsx':
@@ -61,7 +63,7 @@ async def load_data():
                     print(f"[Rejections] Data loaded from Vercel Blob at {datetime.now()}")
                     return data
                 else:
-                    print(f"[Rejections] File not found in Vercel Blob.")
+                    print(f"[Rejections] File not found in Vercel Blob. Filenames available: {[b['pathname'] for b in blobs['blobs']]}")
             except Exception as e:
                 print(f"[Rejections] Failed to load from Vercel Blob: {e}")
         if DATA_FILE.exists():

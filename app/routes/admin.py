@@ -18,7 +18,7 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 BLOB_ENABLED = config.validate_blob_config()
 
 if BLOB_ENABLED:
-    from vercel_blob import put, list, del_
+    from vercel_blob import put, list, delete
 else:
     print("⚠ Vercel Blob not configured - admin features will be limited")
 

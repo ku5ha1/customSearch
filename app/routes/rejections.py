@@ -114,6 +114,7 @@ async def rejections_search(request: Request, response: Response, query: str = F
 
     for row in data:
         row_text = ' '.join(str(row[col]).lower() for col in SEARCH_COLUMNS if col in row and row[col] is not None)
+        print(f"ROW TEXT: {row_text}")
         if all(word in row_text for word in query_words):
             matches = {col: row[col] for col in SEARCH_COLUMNS if col in row and row[col] is not None and any(word in str(row[col]).lower() for word in query_words)}
             results.append({

@@ -52,7 +52,7 @@ async def load_data():
                 download_url = None
                 for blob in blobs['blobs']:
                     if blob['pathname'] == 'rejection_reasons.xlsx':
-                        download_url = blob['downloadUrl']
+                        download_url = blob.get('downloadUrl') or blob.get('url')
                         break
                 if download_url:
                     response = requests.get(download_url)

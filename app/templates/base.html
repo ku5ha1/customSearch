@@ -65,6 +65,7 @@
           <li><a href="/category-tree" class="nav-link" id="nav-category-tree">Category Tree</a></li>
           <li><a href="/rejections" class="nav-link" id="nav-rejections">Rejections</a></li>
         </ul>
+        <button id="clear-cache-btn" class="ml-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition">Clear Cache</button>
       </div>
     </nav>
 
@@ -84,6 +85,25 @@
             link.classList.add('active');
           }
         });
+
+        // Clear Cache button logic
+        const clearBtn = document.getElementById('clear-cache-btn');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', async function() {
+            clearBtn.disabled = true;
+            clearBtn.textContent = 'Clearing...';
+            try {
+              const resp = await fetch('/cache/clear', { method: 'POST' });
+              const data = await resp.json();
+              alert(data.message || 'Cache cleared!');
+            } catch (e) {
+              alert('Failed to clear cache.');
+            } finally {
+              clearBtn.disabled = false;
+              clearBtn.textContent = 'Clear Cache';
+            }
+          });
+        }
       });
     </script>
   </body>

@@ -18,7 +18,7 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 BLOB_ENABLED = config.validate_blob_config()
 
 if BLOB_ENABLED:
-    from vercel_blob import put, list, delete
+    from vercel_blob import put, list, del_
 else:
     print("⚠ Vercel Blob not configured - admin features will be limited")
 
@@ -79,7 +79,7 @@ async def upload_to_vercel_blob(file_content: bytes, filename: str) -> str:
     """Upload file to Vercel Blob Storage"""
     try:
         blob = put(filename, file_content, {"access": "public", "allowOverwrite": True})
-        return blob.url
+        return blob["url"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to cloud storage: {str(e)}")
 

@@ -4,4 +4,4 @@ jinja2
 pandas
 openpyxl 
 python-multipart
-vercel-blob
+vercel_blob

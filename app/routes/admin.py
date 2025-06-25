@@ -78,7 +78,7 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
 async def upload_to_vercel_blob(file_content: bytes, filename: str) -> str:
     """Upload file to Vercel Blob Storage"""
     try:
-        blob = await put(filename, file_content, {"access": "public"})
+        blob = put(filename, file_content, {"access": "public"})
         return blob.url
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to cloud storage: {str(e)}")

@@ -7,11 +7,20 @@ import re
 import math
 import hashlib
 from datetime import datetime
+import io
+import requests
+
+from app.config import config
 
 router = APIRouter()
 current_dir = Path(__file__).parent.parent
 DATA_FILE = current_dir.parent / "data" / "concat_rule.xlsx"
 templates = Jinja2Templates(directory=current_dir / "templates")
+
+# Check if Vercel Blob is configured
+BLOB_ENABLED = config.validate_blob_config()
+if BLOB_ENABLED:
+    print("⚠ Vercel Blob not configured - Concat Rule will use local files only")
 
 SEARCH_COLUMNS = [
     "Category Name", "L1", "L2", "Concat Rule"
@@ -31,14 +40,42 @@ def clean_data_for_json(data):
 def generate_cache_key(query: str) -> str:
     return hashlib.md5(f"concat_rule_search_{query.lower().strip()}".encode()).hexdigest()
 
-# Load Excel on module load
-try:
-    df = pd.read_excel(DATA_FILE, header=0)
-    df = df.where(pd.notnull(df), None)
-    data = df.to_dict(orient="records")
-    print(f"[Concat Rule] Data loaded successfully at {datetime.now()}")
-except Exception as e:
-    raise RuntimeError(f"Failed to load concat rule data: {e}")
+# Load data from Vercel Blob or local file
+async def load_data():
+    try:
+        if BLOB_ENABLED:
+            try:
+                import vercel_blob
+                blobs = vercel_blob.list()
+                download_url = None
+                for blob in blobs['blobs']:
+                    if blob['pathname'] == 'concat_rule.xlsx':
+                        download_url = blob.get('downloadUrl') or blob.get('url')
+                        break
+                if download_url:
+                    response = requests.get(download_url)
+                    response.raise_for_status()
+                    df = pd.read_excel(io.BytesIO(response.content), header=0)
+                    df = df.where(pd.notnull(df), None)
+                    data = df.to_dict(orient="records")
+                    print(f"[Concat Rule] Data loaded from Vercel Blob at {datetime.now()}")
+                    return data
+                else:
+                    print(f"[Concat Rule] File not found in Vercel Blob.")
+            except Exception as e:
+                print(f"[Concat Rule] Failed to load from Vercel Blob: {e}")
+        if DATA_FILE.exists():
+            df = pd.read_excel(DATA_FILE, header=0)
+            df = df.where(pd.notnull(df), None)
+            data = df.to_dict(orient="records")
+            print(f"[Concat Rule] Data loaded from local file at {datetime.now()}")
+            return data
+        else:
+            print(f"[Concat Rule] Warning: Data file not found at {DATA_FILE}")
+            return []
+    except Exception as e:
+        print(f"[Concat Rule] Warning: Failed to load data: {e}")
+        return []
 
 # Routes
 @router.get("/concat-rule", response_class=HTMLResponse)
@@ -57,6 +94,9 @@ async def concat_rule_search(request: Request, response: Response, query: str = 
     if not query:
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
 
+    # Load data (from Blob or local file)
+    data = await load_data()
+
     # Check cache first
     from app.main import search_cache
     cache_key = generate_cache_key(query)
@@ -67,16 +107,13 @@ async def concat_rule_search(request: Request, response: Response, query: str = 
         return JSONResponse(cached_result)
 
     # Perform search if not in cache
-    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    query_words = query.lower().split()
     results = []
 
     for row in data:
-        matches = {}
-        for col in SEARCH_COLUMNS:
-            if col in row and row[col] is not None:
-                if pattern.search(str(row[col])):
-                    matches[col] = row[col]
-        if matches:
+        row_text = ' '.join(str(row[col]).lower() for col in SEARCH_COLUMNS if col in row and row[col] is not None)
+        if all(word in row_text for word in query_words):
+            matches = {col: row[col] for col in SEARCH_COLUMNS if col in row and row[col] is not None and any(word in str(row[col]).lower() for word in query_words)}
             results.append({
                 "row_data": clean_data_for_json(row),
                 "matched_columns": matches

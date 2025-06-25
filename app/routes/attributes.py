@@ -112,13 +112,11 @@ async def attributes_search(request: Request, response: Response, query: str = F
     results = []
 
     for row in data:
-        matches = {}
-        for col in SEARCH_COLUMNS:
-            if col in row and row[col] is not None:
-                cell_text = str(row[col]).lower()
-                if all(word in cell_text for word in query_words):
-                    matches[col] = row[col]
-        if matches:
+        # Combine all searchable columns into one string
+        row_text = ' '.join(str(row[col]).lower() for col in SEARCH_COLUMNS if col in row and row[col] is not None)
+        if all(word in row_text for word in query_words):
+            # Optionally, show which columns matched
+            matches = {col: row[col] for col in SEARCH_COLUMNS if col in row and row[col] is not None and any(word in str(row[col]).lower() for word in query_words)}
             results.append({
                 "row_data": clean_data_for_json(row),
                 "matched_columns": matches

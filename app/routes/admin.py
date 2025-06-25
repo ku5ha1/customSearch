@@ -6,6 +6,7 @@ import pandas as pd
 import os
 from datetime import datetime
 import asyncio
+import requests
 
 from app.config import config
 
@@ -85,17 +86,23 @@ async def upload_to_vercel_blob(file_content: bytes, filename: str) -> str:
 async def download_from_vercel_blob(filename: str, local_path: str):
     """Download file from Vercel Blob Storage to local directory"""
     try:
-        from vercel_blob import get
-        blob = await get(filename)
-        
-        # Ensure data directory exists
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        
-        # Write file to local directory
-        with open(local_path, "wb") as f:
-            f.write(blob)
-        
-        return True
+        import vercel_blob
+        blobs = vercel_blob.list()
+        download_url = None
+        for blob in blobs['blobs']:
+            if blob['pathname'] == filename:
+                download_url = blob['downloadUrl']
+                break
+        if download_url:
+            response = requests.get(download_url)
+            response.raise_for_status()
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, "wb") as f:
+                f.write(response.content)
+            return True
+        else:
+            print(f"Failed to find {filename} in Vercel Blob.")
+            return False
     except Exception as e:
         print(f"Failed to download {filename}: {str(e)}")
         return False
@@ -128,9 +135,20 @@ async def download_all_files_from_blob():
 async def get_file_content_from_blob(filename: str) -> bytes:
     """Get file content directly from Vercel Blob Storage"""
     try:
-        from vercel_blob import get
-        blob = await get(filename)
-        return blob
+        import vercel_blob
+        blobs = vercel_blob.list()
+        download_url = None
+        for blob in blobs['blobs']:
+            if blob['pathname'] == filename:
+                download_url = blob['downloadUrl']
+                break
+        if download_url:
+            response = requests.get(download_url)
+            response.raise_for_status()
+            return response.content
+        else:
+            print(f"Failed to find {filename} in Vercel Blob.")
+            return None
     except Exception as e:
         print(f"Failed to get {filename} from blob: {str(e)}")
         return None

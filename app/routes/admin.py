@@ -61,10 +61,21 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
         # Read Excel file
         df = pd.read_excel(file_content, header=0)
         
+        # Convert column names to strings for comparison
+        df_columns = [str(col) for col in df.columns]
+        required_columns_str = [str(col) for col in required_columns]
+        
+        print(f"Debug: Found columns: {df_columns}")
+        print(f"Debug: Required columns: {required_columns_str}")
+        
         # Check if required columns exist
-        missing_columns = [col for col in required_columns if col not in df.columns]
+        missing_columns = []
+        for col in required_columns_str:
+            if col not in df_columns:
+                missing_columns.append(col)
+        
         if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+            return False, f"Missing required columns: {missing_columns}. Found columns: {df_columns}"
         
         # Check if file has data
         if len(df) == 0:

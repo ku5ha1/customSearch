@@ -6,6 +6,8 @@ import pandas as pd
 import os
 from datetime import datetime
 import asyncio
+import requests
+import io
 
 from app.config import config
 
@@ -17,7 +19,7 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 BLOB_ENABLED = config.validate_blob_config()
 
 if BLOB_ENABLED:
-    from vercel_blob import put, list, del_
+    from vercel_blob import put, list, delete
 else:
     print("⚠ Vercel Blob not configured - admin features will be limited")
 
@@ -59,7 +61,7 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
     """Validate Excel file structure"""
     try:
         # Read Excel file
-        df = pd.read_excel(file_content, header=0)
+        df = pd.read_excel(io.BytesIO(file_content), header=0)
         
         # Convert column names to strings for comparison
         df_columns = [str(col) for col in df.columns]
@@ -88,25 +90,31 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
 async def upload_to_vercel_blob(file_content: bytes, filename: str) -> str:
     """Upload file to Vercel Blob Storage"""
     try:
-        blob = await put(filename, file_content, {"access": "public"})
-        return blob.url
+        blob = put(filename, file_content, {"access": "public", "allowOverwrite": True})
+        return blob["url"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to cloud storage: {str(e)}")
 
 async def download_from_vercel_blob(filename: str, local_path: str):
     """Download file from Vercel Blob Storage to local directory"""
     try:
-        from vercel_blob import get
-        blob = await get(filename)
-        
-        # Ensure data directory exists
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        
-        # Write file to local directory
-        with open(local_path, "wb") as f:
-            f.write(blob)
-        
-        return True
+        import vercel_blob
+        blobs = vercel_blob.list()
+        download_url = None
+        for blob in blobs['blobs']:
+            if blob['pathname'] == filename:
+                download_url = blob['downloadUrl']
+                break
+        if download_url:
+            response = requests.get(download_url)
+            response.raise_for_status()
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, "wb") as f:
+                f.write(response.content)
+            return True
+        else:
+            print(f"Failed to find {filename} in Vercel Blob.")
+            return False
     except Exception as e:
         print(f"Failed to download {filename}: {str(e)}")
         return False
@@ -139,9 +147,20 @@ async def download_all_files_from_blob():
 async def get_file_content_from_blob(filename: str) -> bytes:
     """Get file content directly from Vercel Blob Storage"""
     try:
-        from vercel_blob import get
-        blob = await get(filename)
-        return blob
+        import vercel_blob
+        blobs = vercel_blob.list()
+        download_url = None
+        for blob in blobs['blobs']:
+            if blob['pathname'] == filename:
+                download_url = blob['downloadUrl']
+                break
+        if download_url:
+            response = requests.get(download_url)
+            response.raise_for_status()
+            return response.content
+        else:
+            print(f"Failed to find {filename} in Vercel Blob.")
+            return None
     except Exception as e:
         print(f"Failed to get {filename} from blob: {str(e)}")
         return None
@@ -196,7 +215,7 @@ async def upload_excel_file(
             "success": True,
             "message": f"{config_excel['description']} updated successfully",
             "filename": filename,
-            "rows_processed": len(pd.read_excel(file_content)),
+            "rows_processed": len(pd.read_excel(io.BytesIO(file_content))),
             "timestamp": datetime.now().isoformat()
         })
         

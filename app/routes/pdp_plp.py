@@ -8,6 +8,7 @@ import math
 import hashlib
 from datetime import datetime
 import io
+import requests
 
 from app.config import config
 
@@ -20,8 +21,6 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 BLOB_ENABLED = config.validate_blob_config()
 
 if BLOB_ENABLED:
-    from vercel_blob import get
-else:
     print("⚠ Vercel Blob not configured - PDP-PLP will use local files only")
 
 SEARCH_COLUMNS = [
@@ -53,12 +52,23 @@ async def load_data():
         if BLOB_ENABLED:
             # Try to load from Vercel Blob first
             try:
-                blob = await get("category_pdp_plp.xlsx")
-                df = pd.read_excel(io.BytesIO(blob), header=0)
-                df = df.where(pd.notnull(df), None)
-                data = df.to_dict(orient="records")
-                print(f"[PDP-PLP] Data loaded from Vercel Blob at {datetime.now()}")
-                return data
+                import vercel_blob
+                blobs = vercel_blob.list()
+                download_url = None
+                for blob in blobs['blobs']:
+                    if blob['pathname'] == 'category_pdp_plp.xlsx':
+                        download_url = blob['downloadUrl']
+                        break
+                if download_url:
+                    response = requests.get(download_url)
+                    response.raise_for_status()
+                    df = pd.read_excel(io.BytesIO(response.content), header=0)
+                    df = df.where(pd.notnull(df), None)
+                    data = df.to_dict(orient="records")
+                    print(f"[PDP-PLP] Data loaded from Vercel Blob at {datetime.now()}")
+                    return data
+                else:
+                    print(f"[PDP-PLP] File not found in Vercel Blob.")
             except Exception as e:
                 print(f"[PDP-PLP] Failed to load from Vercel Blob: {e}")
                 # Fallback to local file

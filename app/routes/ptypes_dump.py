@@ -8,6 +8,7 @@ import math
 import hashlib
 from datetime import datetime
 import io
+import requests
 
 from app.config import config
 
@@ -19,8 +20,6 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 # Check if Vercel Blob is configured
 BLOB_ENABLED = config.validate_blob_config()
 if BLOB_ENABLED:
-    from vercel_blob import get
-else:
     print("⚠ Vercel Blob not configured - Ptypes Dump will use local files only")
 
 SEARCH_COLUMNS = [
@@ -46,12 +45,23 @@ async def load_data():
     try:
         if BLOB_ENABLED:
             try:
-                blob = await get("ptypes_dump.xlsx")
-                df = pd.read_excel(io.BytesIO(blob), sheet_name='PTypes Dump', header=0)
-                df = df.where(pd.notnull(df), None)
-                data = df.to_dict(orient="records")
-                print(f"[Ptypes Dump] Data loaded from Vercel Blob at {datetime.now()}")
-                return data
+                import vercel_blob
+                blobs = vercel_blob.list()
+                download_url = None
+                for blob in blobs['blobs']:
+                    if blob['pathname'] == 'ptypes_dump.xlsx':
+                        download_url = blob['downloadUrl']
+                        break
+                if download_url:
+                    response = requests.get(download_url)
+                    response.raise_for_status()
+                    df = pd.read_excel(io.BytesIO(response.content), sheet_name='PTypes Dump', header=0)
+                    df = df.where(pd.notnull(df), None)
+                    data = df.to_dict(orient="records")
+                    print(f"[Ptypes Dump] Data loaded from Vercel Blob at {datetime.now()}")
+                    return data
+                else:
+                    print(f"[Ptypes Dump] File not found in Vercel Blob.")
             except Exception as e:
                 print(f"[Ptypes Dump] Failed to load from Vercel Blob: {e}")
         if DATA_FILE.exists():

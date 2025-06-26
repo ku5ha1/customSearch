@@ -8,6 +8,7 @@ import math
 import hashlib
 from datetime import datetime
 import io
+import requests
 
 from app.config import config
 
@@ -19,8 +20,6 @@ templates = Jinja2Templates(directory=current_dir / "templates")
 # Check if Vercel Blob is configured
 BLOB_ENABLED = config.validate_blob_config()
 if BLOB_ENABLED:
-    from vercel_blob import get
-else:
     print("⚠ Vercel Blob not configured - Category Tree will use local files only")
 
 SEARCH_COLUMNS = [
@@ -46,12 +45,23 @@ async def load_data():
     try:
         if BLOB_ENABLED:
             try:
-                blob = await get("category_tree.xlsx")
-                df = pd.read_excel(io.BytesIO(blob), header=0)
-                df = df.where(pd.notnull(df), None)
-                data = df.to_dict(orient="records")
-                print(f"[Category Tree] Data loaded from Vercel Blob at {datetime.now()}")
-                return data
+                import vercel_blob
+                blobs = vercel_blob.list()
+                download_url = None
+                for blob in blobs['blobs']:
+                    if blob['pathname'] == 'category_tree.xlsx':
+                        download_url = blob['downloadUrl']
+                        break
+                if download_url:
+                    response = requests.get(download_url)
+                    response.raise_for_status()
+                    df = pd.read_excel(io.BytesIO(response.content), header=0)
+                    df = df.where(pd.notnull(df), None)
+                    data = df.to_dict(orient="records")
+                    print(f"[Category Tree] Data loaded from Vercel Blob at {datetime.now()}")
+                    return data
+                else:
+                    print(f"[Category Tree] File not found in Vercel Blob.")
             except Exception as e:
                 print(f"[Category Tree] Failed to load from Vercel Blob: {e}")
         if DATA_FILE.exists():

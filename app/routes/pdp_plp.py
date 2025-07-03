@@ -31,6 +31,11 @@ SEARCH_COLUMNS = [
     "PLP1", "PLP2", "PLP3", "PLP4"
 ]
 
+# Data file cache (in-memory)
+DATA_CACHE = None
+DATA_CACHE_TIMESTAMP = 0
+DATA_CACHE_TTL = 600  # seconds (10 minutes)
+
 # Helper to clean NaN for JSON
 def clean_data_for_json(data):
     if isinstance(data, dict):
@@ -47,7 +52,12 @@ def generate_cache_key(query: str) -> str:
 
 # Load data from Vercel Blob or local file
 async def load_data():
-    """Load data from Vercel Blob if available, otherwise from local file"""
+    """Load data from Vercel Blob if available, otherwise from local file, with in-memory caching"""
+    global DATA_CACHE, DATA_CACHE_TIMESTAMP
+    now = datetime.now().timestamp()
+    # Check if data is cached and not expired
+    if DATA_CACHE is not None and (now - DATA_CACHE_TIMESTAMP) < DATA_CACHE_TTL:
+        return DATA_CACHE
     try:
         if BLOB_ENABLED:
             # Try to load from Vercel Blob first
@@ -66,24 +76,28 @@ async def load_data():
                     df = df.where(pd.notnull(df), None)
                     data = df.to_dict(orient="records")
                     print(f"[PDP-PLP] Data loaded from Vercel Blob at {datetime.now()}")
+                    # Cache the data
+                    DATA_CACHE = data
+                    DATA_CACHE_TIMESTAMP = now
                     return data
                 else:
                     print(f"[PDP-PLP] File not found in Vercel Blob.")
             except Exception as e:
                 print(f"[PDP-PLP] Failed to load from Vercel Blob: {e}")
                 # Fallback to local file
-        
         # Load from local file
         if DATA_FILE.exists():
             df = pd.read_excel(DATA_FILE, header=0)
             df = df.where(pd.notnull(df), None)
             data = df.to_dict(orient="records")
             print(f"[PDP-PLP] Data loaded from local file at {datetime.now()}")
+            # Cache the data
+            DATA_CACHE = data
+            DATA_CACHE_TIMESTAMP = now
             return data
         else:
             print(f"[PDP-PLP] Warning: Data file not found at {DATA_FILE}")
             return []
-            
     except Exception as e:
         print(f"[PDP-PLP] Warning: Failed to load data: {e}")
         return []

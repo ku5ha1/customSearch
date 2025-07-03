@@ -210,7 +210,31 @@ async def upload_excel_file(
         # Clear cache (import here to avoid circular import)
         from app.main import search_cache
         search_cache.clear()
-        
+        # Invalidate in-memory data cache for the relevant route
+        if file_type == "attributes":
+            import app.routes.attributes as mod
+            mod.DATA_CACHE = None
+            mod.DATA_CACHE_TIMESTAMP = 0
+        elif file_type == "category_pdp_plp":
+            import app.routes.pdp_plp as mod
+            mod.DATA_CACHE = None
+            mod.DATA_CACHE_TIMESTAMP = 0
+        elif file_type == "concat_rule":
+            import app.routes.concat_rule as mod
+            mod.DATA_CACHE = None
+            mod.DATA_CACHE_TIMESTAMP = 0
+        elif file_type == "category_tree":
+            import app.routes.category_tree as mod
+            mod.DATA_CACHE = None
+            mod.DATA_CACHE_TIMESTAMP = 0
+        elif file_type == "rejection_reasons":
+            import app.routes.rejections as mod
+            mod.DATA_CACHE = None
+            mod.DATA_CACHE_TIMESTAMP = 0
+        elif file_type == "ptypes_dump":
+            import app.routes.ptypes_dump as mod
+            mod.DATA_CACHE = None
+            mod.DATA_CACHE_TIMESTAMP = 0
         return JSONResponse({
             "success": True,
             "message": f"{config_excel['description']} updated successfully",

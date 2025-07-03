@@ -1,3 +1,4 @@
+from fastapi import APIRouter, Request, Form, Response, Depends
 from fastapi import APIRouter, Request, Form, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -26,6 +27,11 @@ SEARCH_COLUMNS = [
     "l0_category_id", "l0_category", "l1_category_id", "l1_category", "l2_category_id", "l2_category"
 ]
 
+# Data file cache (in-memory)
+DATA_CACHE = None
+DATA_CACHE_TIMESTAMP = 0
+DATA_CACHE_TTL = 600  # seconds (10 minutes)
+
 # Helper to clean NaN for JSON
 def clean_data_for_json(data):
     if isinstance(data, dict):
@@ -42,6 +48,11 @@ def generate_cache_key(query: str) -> str:
 
 # Load data from Vercel Blob or local file
 async def load_data():
+    global DATA_CACHE, DATA_CACHE_TIMESTAMP
+    now = datetime.now().timestamp()
+    # Check if data is cached and not expired
+    if DATA_CACHE is not None and (now - DATA_CACHE_TIMESTAMP) < DATA_CACHE_TTL:
+        return DATA_CACHE
     try:
         if BLOB_ENABLED:
             try:
@@ -59,6 +70,9 @@ async def load_data():
                     df = df.where(pd.notnull(df), None)
                     data = df.to_dict(orient="records")
                     print(f"[Category Tree] Data loaded from Vercel Blob at {datetime.now()}")
+                    # Cache the data
+                    DATA_CACHE = data
+                    DATA_CACHE_TIMESTAMP = now
                     return data
                 else:
                     print(f"[Category Tree] File not found in Vercel Blob.")
@@ -69,6 +83,9 @@ async def load_data():
             df = df.where(pd.notnull(df), None)
             data = df.to_dict(orient="records")
             print(f"[Category Tree] Data loaded from local file at {datetime.now()}")
+            # Cache the data
+            DATA_CACHE = data
+            DATA_CACHE_TIMESTAMP = now
             return data
         else:
             print(f"[Category Tree] Warning: Data file not found at {DATA_FILE}")

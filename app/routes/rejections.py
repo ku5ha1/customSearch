@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form, Response
+from fastapi import APIRouter, Request, Form, Response, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -9,6 +9,7 @@ import hashlib
 from datetime import datetime
 import io
 import requests
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.config import config
 
@@ -26,6 +27,12 @@ SEARCH_COLUMNS = [
     "Reason", "Justification"
 ]
 
+# Data file cache (in-memory)
+DATA_CACHE = None
+DATA_CACHE_TIMESTAMP = 0
+DATA_CACHE_TTL = 600  # seconds (10 minutes)
+LAST_BLOB_READ = None
+
 # Helper to clean NaN for JSON
 def clean_data_for_json(data):
     if isinstance(data, dict):
@@ -42,6 +49,11 @@ def generate_cache_key(query: str) -> str:
 
 # Load data from Vercel Blob or local file
 async def load_data():
+    global DATA_CACHE, DATA_CACHE_TIMESTAMP, LAST_BLOB_READ
+    now = datetime.now().timestamp()
+    # Check if data is cached and not expired
+    if DATA_CACHE is not None and (now - DATA_CACHE_TIMESTAMP) < DATA_CACHE_TTL:
+        return DATA_CACHE
     try:
         print(f"[Rejections] BLOB_ENABLED: {BLOB_ENABLED}")
         if BLOB_ENABLED:
@@ -55,12 +67,17 @@ async def load_data():
                         download_url = blob['downloadUrl']
                         break
                 if download_url:
+                    print(f"[Rejections] BLOB READ at {datetime.now()}")
+                    LAST_BLOB_READ = datetime.now().isoformat()
                     response = requests.get(download_url)
                     response.raise_for_status()
                     df = pd.read_excel(io.BytesIO(response.content), header=0)
                     df = df.where(pd.notnull(df), None)
                     data = df.to_dict(orient="records")
                     print(f"[Rejections] Data loaded from Vercel Blob at {datetime.now()}")
+                    # Cache the data
+                    DATA_CACHE = data
+                    DATA_CACHE_TIMESTAMP = now
                     return data
                 else:
                     print(f"[Rejections] File not found in Vercel Blob. Filenames available: {[b['pathname'] for b in blobs['blobs']]}")
@@ -71,6 +88,9 @@ async def load_data():
             df = df.where(pd.notnull(df), None)
             data = df.to_dict(orient="records")
             print(f"[Rejections] Data loaded from local file at {datetime.now()}")
+            # Cache the data
+            DATA_CACHE = data
+            DATA_CACHE_TIMESTAMP = now
             return data
         else:
             print(f"[Rejections] Warning: Data file not found at {DATA_FILE}")
@@ -137,3 +157,11 @@ async def rejections_search(request: Request, response: Response, query: str = F
     print(f"[Rejections] Found {len(results)} matches for query '{query}' (cached)")
 
     return JSONResponse(result_data)
+
+# Monitoring endpoint
+@router.get("/rejections/blob-status")
+async def blob_status(credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
+    if credentials.username != "admin" or credentials.password != config.ADMIN_PASSWORD:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"last_blob_read": LAST_BLOB_READ, "cache_timestamp": DATA_CACHE_TIMESTAMP}

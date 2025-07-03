@@ -9,7 +9,7 @@ import hashlib
 from datetime import datetime
 import io
 import requests
-from fastapi.security import HTTPBasic
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.config import config
 

@@ -103,7 +103,7 @@ async def download_from_vercel_blob(filename: str, local_path: str):
         download_url = None
         for blob in blobs['blobs']:
             if blob['pathname'] == filename:
-                download_url = blob['downloadUrl']
+                download_url = blob.get('downloadUrl') or blob.get('url')
                 break
         if download_url:
             response = requests.get(download_url)
@@ -152,7 +152,7 @@ async def get_file_content_from_blob(filename: str) -> bytes:
         download_url = None
         for blob in blobs['blobs']:
             if blob['pathname'] == filename:
-                download_url = blob['downloadUrl']
+                download_url = blob.get('downloadUrl') or blob.get('url')
                 break
         if download_url:
             response = requests.get(download_url)

@@ -62,7 +62,7 @@ async def load_data():
                 download_url = None
                 for blob in blobs['blobs']:
                     if blob['pathname'] == 'concat_rule.xlsx':
-                        download_url = blob['downloadUrl']
+                        download_url = blob.get('downloadUrl') or blob.get('url')
                         break
                 if download_url:
                     print(f"[Concat Rule] BLOB READ at {datetime.now()}")
@@ -127,16 +127,13 @@ async def concat_rule_search(request: Request, response: Response, query: str = 
         return JSONResponse(cached_result)
 
     # Perform search if not in cache
-    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    query_words = query.lower().split()
     results = []
 
     for row in data:
-        matches = {}
-        for col in SEARCH_COLUMNS:
-            if col in row and row[col] is not None:
-                if pattern.search(str(row[col])):
-                    matches[col] = row[col]
-        if matches:
+        row_text = ' '.join(str(row[col]).lower() for col in SEARCH_COLUMNS if col in row and row[col] is not None)
+        if all(word in row_text for word in query_words):
+            matches = {col: row[col] for col in SEARCH_COLUMNS if col in row and row[col] is not None and any(word in str(row[col]).lower() for word in query_words)}
             results.append({
                 "row_data": clean_data_for_json(row),
                 "matched_columns": matches

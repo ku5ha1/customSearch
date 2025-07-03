@@ -11,6 +11,8 @@ import io
 import requests
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+security = HTTPBasic()
+
 from app.config import config
 
 router = APIRouter()
@@ -163,5 +165,3 @@ async def blob_status(credentials: HTTPBasicCredentials = Depends(security)):
         from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="Unauthorized")
     return {"last_blob_read": LAST_BLOB_READ, "cache_timestamp": DATA_CACHE_TIMESTAMP}
-
-security = HTTPBasic()

@@ -11,6 +11,8 @@ import io
 import requests
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+security = HTTPBasic()
+
 from app.config import config
 
 router = APIRouter()
@@ -154,7 +156,6 @@ async def concat_rule_search(request: Request, response: Response, query: str = 
     return JSONResponse(result_data)
 
 # Monitoring endpoint
-security = HTTPBasic()
 @router.get("/concat-rule/blob-status")
 async def blob_status(credentials: HTTPBasicCredentials = Depends(security)):
     if credentials.username != "admin" or credentials.password != config.ADMIN_PASSWORD:

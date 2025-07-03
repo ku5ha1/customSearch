@@ -150,3 +150,5 @@ async def category_tree_search(request: Request, response: Response, query: str 
     print(f"[Category Tree] Found {len(results)} matches for query '{query}' (cached)")
 
     return JSONResponse(result_data)
+
+security = HTTPBasic()

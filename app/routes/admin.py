@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import pandas as pd
 import os
+import sqlite3
 from datetime import datetime
 import asyncio
 import requests
@@ -15,13 +16,8 @@ router = APIRouter()
 current_dir = Path(__file__).parent.parent
 templates = Jinja2Templates(directory=current_dir / "templates")
 
-# Check if Vercel Blob is configured
-BLOB_ENABLED = config.validate_blob_config()
-
-if BLOB_ENABLED:
-    from vercel_blob import put, list, delete
-else:
-    print("⚠ Vercel Blob not configured - admin features will be limited")
+# Database file path
+DB_FILE = current_dir.parent / "data" / "custom_search.db"
 
 # Excel file configurations
 EXCEL_FILES = {
@@ -54,6 +50,16 @@ EXCEL_FILES = {
         "filename": "ptypes_dump.xlsx",
         "required_columns": ["ptype_id", "ptype_name"],
         "description": "Product types data"
+    },
+    "color_code": {
+        "filename": "colour_code.xlsx",
+        "required_columns": ["Color Name", "Hex Code"],
+        "description": "Color code data"
+    },
+    "rms_manufacturer_brand": {
+        "filename": "rms_manufacturer_brand.xlsx",
+        "required_columns": ["MfgID", "MfgName", "BrandID", "BrandName"],
+        "description": "RMS Manufacturer Brand data"
     }
 }
 
@@ -87,13 +93,40 @@ def validate_excel_file(file_content: bytes, required_columns: list) -> bool:
     except Exception as e:
         return False, f"Error reading Excel file: {str(e)}"
 
-async def upload_to_vercel_blob(file_content: bytes, filename: str) -> str:
-    """Upload file to Vercel Blob Storage"""
-    try:
-        blob = put(filename, file_content, {"access": "public", "allowOverwrite": True})
-        return blob["url"]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload to cloud storage: {str(e)}")
+async def update_sqlite_table(file_type: str, file_content: bytes):
+    """Update SQLite table with new Excel data (REPLACE existing)"""
+    
+    # Map file types to table names
+    table_mapping = {
+        "attributes": "attributes",
+        "category_pdp_plp": "category_pdp_plp", 
+        "concat_rule": "concat_rule",
+        "category_tree": "category_tree",
+        "rejection_reasons": "rejection_reasons",
+        "ptypes_dump": "ptypes_dump",
+        "color_code": "color_codes",
+        "rms_manufacturer_brand": "rms_manufacturer_brands"
+    }
+    
+    table_name = table_mapping.get(file_type)
+    if not table_name:
+        raise ValueError(f"Unknown file type: {file_type}")
+    
+    # Read Excel data
+    df = pd.read_excel(io.BytesIO(file_content))
+    
+    # Connect to SQLite database
+    with sqlite3.connect(DB_FILE) as conn:
+        # DELETE existing data (same as current "replace" behavior)
+        conn.execute(f"DELETE FROM {table_name}")
+        
+        # INSERT new data
+        df.to_sql(table_name, conn, if_exists='append', index=False)
+        
+        # Commit changes
+        conn.commit()
+        
+        print(f"✓ Updated {table_name} table with {len(df)} rows")
 
 async def download_from_vercel_blob(filename: str, local_path: str):
     """Download file from Vercel Blob Storage to local directory"""
@@ -176,14 +209,11 @@ async def upload_excel_file(
     file: UploadFile = File(...),
     admin_password: str = Form(...)
 ):
-    """Upload Excel file to cloud storage"""
+    """Upload Excel file and update SQLite database"""
     
     # Admin authentication
     if admin_password != config.ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid admin password")
-    
-    if not BLOB_ENABLED:
-        raise HTTPException(status_code=503, detail="Vercel Blob not configured. Please set BLOB_READ_WRITE_TOKEN environment variable.")
     
     if file_type not in EXCEL_FILES:
         raise HTTPException(status_code=400, detail="Invalid file type")
@@ -203,9 +233,8 @@ async def upload_excel_file(
         raise HTTPException(status_code=400, detail=message)
     
     try:
-        # Upload to Vercel Blob
-        filename = config_excel["filename"]
-        blob_url = await upload_to_vercel_blob(file_content, filename)
+        # Update SQLite database (REPLACE existing data)
+        await update_sqlite_table(file_type, file_content)
         
         # Clear cache (import here to avoid circular import)
         from app.main import search_cache
@@ -237,37 +266,64 @@ async def upload_excel_file(
             mod.DATA_CACHE_TIMESTAMP = 0
         return JSONResponse({
             "success": True,
-            "message": f"{config_excel['description']} updated successfully",
-            "filename": filename,
+            "message": f"{config_excel['description']} updated successfully in database",
+            "filename": config_excel["filename"],
             "rows_processed": len(pd.read_excel(io.BytesIO(file_content))),
             "timestamp": datetime.now().isoformat()
         })
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
 
 @router.get("/admin/status")
 async def get_upload_status():
-    """Get status of uploaded files"""
-    if not BLOB_ENABLED:
-        return JSONResponse({
-            "error": "Vercel Blob not configured",
-            "files": {file_type: {"filename": config["filename"], "uploaded": False, "description": config["description"]} 
-                     for file_type, config in EXCEL_FILES.items()}
-        })
-    
+    """Get status of database tables"""
     try:
-        blobs = await list()
-        uploaded_files = [blob.pathname for blob in blobs.blobs]
-        
         status = {}
-        for file_type, config in EXCEL_FILES.items():
-            filename = config["filename"]
-            status[file_type] = {
-                "filename": filename,
-                "uploaded": filename in uploaded_files,
-                "description": config["description"]
-            }
+        
+        if DB_FILE.exists():
+            with sqlite3.connect(DB_FILE) as conn:
+                # Get list of tables
+                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                existing_tables = [row[0] for row in cursor.fetchall()]
+                
+                for file_type, config in EXCEL_FILES.items():
+                    table_name = file_type.replace('_', '')  # Simple mapping
+                    if file_type == "category_pdp_plp":
+                        table_name = "category_pdp_plp"
+                    elif file_type == "concat_rule":
+                        table_name = "concat_rule"
+                    elif file_type == "category_tree":
+                        table_name = "category_tree"
+                    elif file_type == "rejection_reasons":
+                        table_name = "rejection_reasons"
+                    elif file_type == "ptypes_dump":
+                        table_name = "ptypes_dump"
+                    elif file_type == "attributes":
+                        table_name = "attributes"
+                    
+                    # Check if table exists and has data
+                    table_exists = table_name in existing_tables
+                    row_count = 0
+                    if table_exists:
+                        cursor = conn.execute(f"SELECT COUNT(*) FROM {table_name}")
+                        row_count = cursor.fetchone()[0]
+                    
+                    status[file_type] = {
+                        "filename": config["filename"],
+                        "uploaded": table_exists and row_count > 0,
+                        "description": config["description"],
+                        "row_count": row_count
+                    }
+        else:
+            # Database doesn't exist yet
+            for file_type, config in EXCEL_FILES.items():
+                status[file_type] = {
+                    "filename": config["filename"],
+                    "uploaded": False,
+                    "description": config["description"],
+                    "row_count": 0
+                }
         
         return JSONResponse(status)
         

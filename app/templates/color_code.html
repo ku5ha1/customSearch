@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-white px-[3%] py-8">
+    <h4 class="text-4xl font-bold text-gray-800 mb-2">Color Code</h4>
+    <p class="text-gray-600 mb-6">Search color codes by name or hex code.</p>
+    <form id="searchForm" class="flex flex-col sm:flex-row gap-3 mb-6">
+        <input type="text" name="query" placeholder="Enter search term" required autocomplete="off" class="flex-grow px-4 py-3 border border-gray-300 rounded-md shadow-sm text-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="submit" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-md text-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Search</button>
+    </form>
+    <div id="loading" class="hidden py-4 text-blue-600 italic">Searching, please wait...</div>
+    <div id="results" class="mt-6 overflow-x-auto"></div>
+</div>
+<script>
+document.getElementById("searchForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const query = e.target.query.value.trim();
+    if (!query) { alert("Please enter a search term"); return; }
+    const loading = document.getElementById("loading");
+    const results = document.getElementById("results");
+    loading.classList.remove("hidden");
+    results.innerHTML = "";
+    try {
+        const response = await fetch(`/color-code/search?t=${Date.now()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `query=${encodeURIComponent(query)}`
+        });
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        const data = await response.json();
+        if (data.total_matches === 0) {
+            results.innerHTML = `<p class=\"text-gray-600 italic\">No results found for \"${data.query}\"</p>`;
+        } else {
+            const header = document.createElement('div');
+            header.innerHTML = `<h2 class=\"text-xl font-bold text-gray-800 mb-1\">${data.total_matches} results for \"${data.query}\"</h2><p class=\"text-sm text-gray-500 mb-4\">Last updated: ${new Date(data.timestamp).toLocaleString()}</p>`;
+            results.appendChild(header);
+            const table = document.createElement("table");
+            table.className = "min-w-full bg-white border border-gray-300";
+            const thead = `<thead class=\"bg-gray-100\"><tr><th class=\"border px-4 py-2 text-left\">Color Name</th><th class=\"border px-4 py-2 text-left\">Hex Code</th></tr></thead>`;
+            table.innerHTML = thead;
+            const tbody = document.createElement("tbody");
+            data.results.forEach(result => {
+                const row = result.row_data;
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-blue-50";
+                const colorName = row["Color Name"] || "";
+                const hexCode = row["Hex Code"] || "";
+                const isNameMatch = result.matched_columns.hasOwnProperty("Color Name");
+                const isHexMatch = result.matched_columns.hasOwnProperty("Hex Code");
+                tr.innerHTML = `<td class=\"border px-4 py-2\">${isNameMatch ? `<span class=\"bg-yellow-200 text-blue-900 font-semibold px-1 rounded\">${highlightMatch(colorName, data.query)}</span>` : colorName}</td><td class=\"border px-4 py-2\">${isHexMatch ? `<span class=\"bg-yellow-200 text-blue-900 font-semibold px-1 rounded\">${highlightMatch(hexCode, data.query)}</span>` : hexCode}</td>`;
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            results.appendChild(table);
+        }
+    } catch (err) {
+        results.innerHTML = "<p class='text-red-600'>Something went wrong. Please try again.</p>";
+        console.error(err);
+    } finally {
+        loading.classList.add("hidden");
+    }
+});
+function highlightMatch(text, query) {
+    if (text === null || text === undefined) return '';
+    const safeText = String(text);
+    const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(safeQuery, 'gi');
+    return safeText.replace(regex, match => `<span class=\"match\">${match}</span>`);
+}
+</script>
+{% endblock %} 

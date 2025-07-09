@@ -9,19 +9,14 @@ import hashlib
 from datetime import datetime
 import io
 import requests
+import sqlite3
 
 from app.config import config
 
 router = APIRouter()
 current_dir = Path(__file__).parent.parent
-DATA_FILE = current_dir.parent / "data" / "category_pdp_plp.xlsx"
+DB_FILE = current_dir.parent / "data" / "custom_search.db"
 templates = Jinja2Templates(directory=current_dir / "templates")
-
-# Check if Vercel Blob is configured
-BLOB_ENABLED = config.validate_blob_config()
-
-if BLOB_ENABLED:
-    print("⚠ Vercel Blob not configured - PDP-PLP will use local files only")
 
 SEARCH_COLUMNS = [
     "L0_category", "L1_category", "L1_category_id", 
@@ -50,53 +45,29 @@ def clean_data_for_json(data):
 def generate_cache_key(query: str) -> str:
     return hashlib.md5(f"pdp_plp_search_{query.lower().strip()}".encode()).hexdigest()
 
-# Load data from Vercel Blob or local file
+# Load data from SQLite database
 async def load_data():
-    """Load data from Vercel Blob if available, otherwise from local file, with in-memory caching"""
+    """Load data from SQLite database with in-memory caching"""
     global DATA_CACHE, DATA_CACHE_TIMESTAMP
     now = datetime.now().timestamp()
     # Check if data is cached and not expired
     if DATA_CACHE is not None and (now - DATA_CACHE_TIMESTAMP) < DATA_CACHE_TTL:
         return DATA_CACHE
     try:
-        if BLOB_ENABLED:
-            # Try to load from Vercel Blob first
-            try:
-                import vercel_blob
-                blobs = vercel_blob.list()
-                download_url = None
-                for blob in blobs['blobs']:
-                    if blob['pathname'] == 'category_pdp_plp.xlsx':
-                        download_url = blob['downloadUrl']
-                        break
-                if download_url:
-                    response = requests.get(download_url)
-                    response.raise_for_status()
-                    df = pd.read_excel(io.BytesIO(response.content), header=0)
-                    df = df.where(pd.notnull(df), None)
-                    data = df.to_dict(orient="records")
-                    print(f"[PDP-PLP] Data loaded from Vercel Blob at {datetime.now()}")
-                    # Cache the data
-                    DATA_CACHE = data
-                    DATA_CACHE_TIMESTAMP = now
-                    return data
-                else:
-                    print(f"[PDP-PLP] File not found in Vercel Blob.")
-            except Exception as e:
-                print(f"[PDP-PLP] Failed to load from Vercel Blob: {e}")
-                # Fallback to local file
-        # Load from local file
-        if DATA_FILE.exists():
-            df = pd.read_excel(DATA_FILE, header=0)
-            df = df.where(pd.notnull(df), None)
-            data = df.to_dict(orient="records")
-            print(f"[PDP-PLP] Data loaded from local file at {datetime.now()}")
-            # Cache the data
-            DATA_CACHE = data
-            DATA_CACHE_TIMESTAMP = now
-            return data
+        if DB_FILE.exists():
+            with sqlite3.connect(DB_FILE) as conn:
+                # Query from SQLite database
+                query = "SELECT * FROM category_pdp_plp"
+                df = pd.read_sql_query(query, conn)
+                df = df.where(pd.notnull(df), None)
+                data = df.to_dict(orient="records")
+                print(f"[PDP-PLP] Data loaded from SQLite database at {datetime.now()}")
+                # Cache the data
+                DATA_CACHE = data
+                DATA_CACHE_TIMESTAMP = now
+                return data
         else:
-            print(f"[PDP-PLP] Warning: Data file not found at {DATA_FILE}")
+            print(f"[PDP-PLP] Warning: Database file not found at {DB_FILE}")
             return []
     except Exception as e:
         print(f"[PDP-PLP] Warning: Failed to load data: {e}")
@@ -119,13 +90,13 @@ async def pdp_plp_search(request: Request, response: Response, query: str = Form
     if not query:
         return JSONResponse({"error": "Query cannot be empty"}, status_code=400)
 
-    # Load data (from Blob or local file)
+    # Load data from SQLite database
     data = await load_data()
     
     # Check if data is available
     if not data:
         return JSONResponse({
-            "error": "Data file not available. Please ensure category_pdp_plp.xlsx is uploaded via admin interface.",
+            "error": "Data not available. Please ensure category_pdp_plp data is uploaded via admin interface.",
             "query": query,
             "results": [],
             "total_matches": 0,

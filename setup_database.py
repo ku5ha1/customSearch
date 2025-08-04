@@ -60,6 +60,11 @@ def create_database():
             "filename": "rms_manufacturer_brand.xlsx",
             "required_columns": ["ManufacturerID", "ManufacturerName", "BrandID", "BrandName", "Description"],
             "description": "RMS Manufacturer Brand data"
+        },
+        "magazine": {
+            "filename": "Magazine.xlsx",
+            "required_columns": ["brand_name", "l2_category", "ptype"],
+            "description": "Magazine data"
         }
     }
     
@@ -72,7 +77,8 @@ def create_database():
         "rejection_reasons": "rejection_reasons",
         "ptypes_dump": "ptypes_dump",
         "color_code": "color_codes",
-        "rms_manufacturer_brand": "rms_manufacturer_brands"
+        "rms_manufacturer_brand": "rms_manufacturer_brands",
+        "magazine": "magazine"
     }
     
     print("🔧 Setting up SQLite database...")

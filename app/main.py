@@ -7,7 +7,7 @@ import time
 from collections import OrderedDict
 from typing import Dict, Any, Optional
 
-from app.routes import pdp_plp, attributes, concat_rule, category_tree, rejections, ptypes_dump, admin, color_code, rms_manufacturer_brand
+from app.routes import pdp_plp, attributes, concat_rule, category_tree, rejections, ptypes_dump, admin, color_code, rms_manufacturer_brand, magazine
 
 # Simple in-memory cache with TTL
 class SimpleCache:
@@ -98,6 +98,7 @@ app.include_router(ptypes_dump.router)
 app.include_router(admin.router)
 app.include_router(color_code.router)
 app.include_router(rms_manufacturer_brand.router)
+app.include_router(magazine.router)
 
 # For Vercel serverless deployment
 if __name__ == "__main__":

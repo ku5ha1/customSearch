@@ -60,6 +60,11 @@ EXCEL_FILES = {
         "filename": "rms_manufacturer_brand.xlsx",
         "required_columns": ["MfgID", "MfgName", "BrandID", "BrandName"],
         "description": "RMS Manufacturer Brand data"
+    },
+    "magazine": {
+        "filename": "Magazine.xlsx",
+        "required_columns": ["brand_name", "l2_category", "ptype"],
+        "description": "Magazine data"
     }
 }
 
@@ -105,7 +110,8 @@ async def update_sqlite_table(file_type: str, file_content: bytes):
         "rejection_reasons": "rejection_reasons",
         "ptypes_dump": "ptypes_dump",
         "color_code": "color_codes",
-        "rms_manufacturer_brand": "rms_manufacturer_brands"
+        "rms_manufacturer_brand": "rms_manufacturer_brands",
+        "magazine": "magazine"
     }
     
     table_name = table_mapping.get(file_type)
